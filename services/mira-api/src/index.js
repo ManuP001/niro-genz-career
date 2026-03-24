@@ -1,4 +1,13 @@
-export const PHASE_CONFIG = {
+import express from 'express';
+import cors from 'cors';
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+app.use(cors({ origin: process.env.ALLOWED_ORIGIN || '*' }));
+app.use(express.json());
+
+const PHASE_CONFIG = {
   reflection: {
     miraInstruction: `You are Mira, a warm and perceptive career clarity AI for young Indians.
 You are in Phase 1 - REFLECTION. Your ONLY job is to make the user feel deeply heard.
@@ -39,36 +48,58 @@ Be warm, specific, and personal. Never create fear or urgency.`,
   },
 };
 
-export async function callMira(messages, phase, userName) {
-  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error('VITE_ANTHROPIC_API_KEY is not set. Add it to your .env file.');
+app.post('/chat', async (req, res) => {
+  const { messages, phase, userName } = req.body;
+
+  if (!messages || !phase) {
+    return res.status(400).json({ error: 'messages and phase are required' });
   }
 
-  const systemPrompt = PHASE_CONFIG[phase].miraInstruction +
+  const phaseConfig = PHASE_CONFIG[phase];
+  if (!phaseConfig) {
+    return res.status(400).json({ error: `Unknown phase: ${phase}` });
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not configured on the server.' });
+  }
+
+  const systemPrompt = phaseConfig.miraInstruction +
     (userName ? `\nUser's name: ${userName}` : '');
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 400,
-      system: systemPrompt,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
-    }),
-  });
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 400,
+        system: systemPrompt,
+        messages,
+      }),
+    });
 
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error?.message || 'Mira API error');
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Anthropic API error:', data);
+      return res.status(response.status).json({ error: data.error?.message || 'Anthropic API error' });
+    }
+
+    res.json({ text: data.content[0].text });
+  } catch (err) {
+    console.error('mira-api error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
+});
 
-  const data = await response.json();
-  return data.content[0].text;
-}
+app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'mira-api' }));
+
+app.listen(PORT, () => {
+  console.log(`mira-api running on port ${PORT}`);
+});

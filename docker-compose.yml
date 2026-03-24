@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - mira-service
+    restart: unless-stopped
+
+  mira-service:
+    build: ./services/mira-api
+    ports:
+      - "3001:3001"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ALLOWED_ORIGIN=http://localhost
+    restart: unless-stopped

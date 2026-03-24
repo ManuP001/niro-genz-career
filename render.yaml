@@ -1,9 +1,21 @@
 services:
   - type: web
-    name: niro-career
+    name: niro-frontend
     env: static
+    rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
     envVars:
-      - key: VITE_ANTHROPIC_API_KEY
+      - key: VITE_API_URL
+        value: https://niro-mira-api.onrender.com
+
+  - type: web
+    name: niro-mira-api
+    env: docker
+    rootDir: services/mira-api
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: ANTHROPIC_API_KEY
         sync: false
+      - key: ALLOWED_ORIGIN
+        value: https://niro-frontend.onrender.com

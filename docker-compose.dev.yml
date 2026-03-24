@@ -1,0 +1,30 @@
+version: '3.8'
+
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Or run services separately:
+#   cd services/mira-api && npm install && npm run dev
+#   cd frontend && npm install && npm run dev
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      target: builder
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:3001
+    depends_on:
+      - mira-service
+
+  mira-service:
+    command: npm run dev
+    volumes:
+      - ./services/mira-api/src:/app/src
+    environment:
+      - ALLOWED_ORIGIN=http://localhost:5173
