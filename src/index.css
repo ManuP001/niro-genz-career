@@ -1,0 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');
+@import "tailwindcss";
+
+:root {
+  --niro-green: #1C3A2A;
+  --niro-green-mid: #2D5A3D;
+  --niro-green-light: #4A7A5A;
+  --niro-gold: #C4973A;
+  --niro-gold-light: #E8C97A;
+  --niro-cream: #F5F1E8;
+  --niro-cream-dark: #EDE8DC;
+  --niro-ink: #1A1A18;
+  --niro-muted: #6B6960;
+  --niro-border: rgba(28,58,42,0.11);
+  --niro-white: #FFFFFF;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #e5e7eb;
+  min-height: 100vh;
+}
+
+@keyframes mira-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.7; }
+}
+.mira-dot { animation: mira-pulse 2s ease-in-out infinite; }
+
+@keyframes message-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.message-in { animation: message-in 0.2s ease-out; }
+
+@keyframes typing-dot {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+.typing-dot:nth-child(1) { animation: typing-dot 1.2s ease-in-out infinite 0s; }
+.typing-dot:nth-child(2) { animation: typing-dot 1.2s ease-in-out infinite 0.2s; }
+.typing-dot:nth-child(3) { animation: typing-dot 1.2s ease-in-out infinite 0.4s; }
+
+input, textarea { font-family: 'DM Sans', sans-serif; }
