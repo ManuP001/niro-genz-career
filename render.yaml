@@ -13,7 +13,7 @@ services:
     name: niro-mira-api
     env: docker
     rootDir: services/mira-api
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./services/mira-api/Dockerfile
     envVars:
       - key: GEMINI_API_KEY
         sync: false
