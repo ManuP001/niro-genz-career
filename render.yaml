@@ -15,7 +15,7 @@ services:
     rootDir: services/mira-api
     dockerfilePath: ./Dockerfile
     envVars:
-      - key: ANTHROPIC_API_KEY
+      - key: GEMINI_API_KEY
         sync: false
       - key: ALLOWED_ORIGIN
         value: https://niro-frontend.onrender.com

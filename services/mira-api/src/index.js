@@ -60,38 +60,42 @@ app.post('/chat', async (req, res) => {
     return res.status(400).json({ error: `Unknown phase: ${phase}` });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not configured on the server.' });
+    return res.status(500).json({ error: 'GEMINI_API_KEY is not configured on the server.' });
   }
 
   const systemPrompt = phaseConfig.miraInstruction +
     (userName ? `\nUser's name: ${userName}` : '');
 
+  // Map conversation history: Anthropic uses 'assistant', Gemini uses 'model'
+  const contents = messages.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }));
+
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 400,
-        system: systemPrompt,
-        messages,
-      }),
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents,
+          generationConfig: { maxOutputTokens: 400 },
+        }),
+      }
+    );
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('Anthropic API error:', data);
-      return res.status(response.status).json({ error: data.error?.message || 'Anthropic API error' });
+      console.error('Gemini API error:', data);
+      return res.status(response.status).json({ error: data.error?.message || 'Gemini API error' });
     }
 
-    res.json({ text: data.content[0].text });
+    res.json({ text: data.candidates[0].content.parts[0].text });
   } catch (err) {
     console.error('mira-api error:', err);
     res.status(500).json({ error: 'Internal server error' });
