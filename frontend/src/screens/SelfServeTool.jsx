@@ -56,9 +56,9 @@ export default function SelfServeTool() {
         prompt = 'Anti-goals: ' + antiGoals + '. Based on these, what is this person actually optimising for? Start with "Based on your anti-goals, here is what you are actually optimising for:". 2 sentences.';
       }
       const response = await callMira([{ role: 'user', content: prompt }], 'reflection', state.user.name);
-      setInsight(response);
+      setInsight(response.text);
     } catch {
-      setInsight('I can see clear patterns in what you shared. Add your API key to unlock full insights from Mira.');
+      setInsight('Mira is taking a moment. Try again in a few seconds.');
     } finally {
       setLoading(false);
     }

@@ -13,9 +13,9 @@ export default function BottomNav() {
   const current = state.currentScreen;
 
   return (
-    <nav style={{
+    <nav className="bottom-nav-mobile" style={{
       position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)',
-      width: '100%', maxWidth: 430, height: 56,
+      width: '100%', maxWidth: 560, height: 56,
       background: 'var(--niro-white)', borderTop: '1px solid var(--niro-border)',
       display: 'flex', alignItems: 'center', zIndex: 50,
     }}>

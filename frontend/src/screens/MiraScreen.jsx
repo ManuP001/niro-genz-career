@@ -5,6 +5,18 @@ import { callMira } from '../api/mira';
 import { PRACTITIONERS } from '../data/practitioners';
 import PhoneGate from './PhoneGate';
 
+// ── Confirmation detection ─────────────────────────────────────────────────
+function isConfirmation(text) {
+  if (!text) return false;
+  const lower = text.toLowerCase().trim();
+  const confirmWords = ['yes', 'yeah', 'yep', 'right', 'exactly', "that's it", 'thats it', 'correct', 'true', 'spot on', 'precisely', 'definitely', 'absolutely', 'accurate', 'uncomfortably accurate'];
+  if (confirmWords.some(w => lower.includes(w))) return true;
+  // Short affirmative (≤ 10 words) counts as confirmation in qualification phase
+  if (lower.split(/\s+/).length <= 10 && lower.length < 60) return true;
+  return false;
+}
+
+// ── Sub-components ─────────────────────────────────────────────────────────
 function TypingIndicator() {
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '4px 16px' }}>
@@ -65,7 +77,7 @@ function RecommendationCard({ recommendation, onBook, onProfile, onSelfServe }) 
 
 function ArtefactCard({ artefact }) {
   const handleShare = async () => {
-    const text = '"' + artefact + '" \u2014 Niro';
+    const text = '"' + artefact + '" — Niro';
     if (navigator.share) {
       await navigator.share({ text }).catch(() => {});
     } else {
@@ -89,7 +101,18 @@ function ArtefactCard({ artefact }) {
   );
 }
 
-export default function MiraScreen() {
+function PhaseDivider({ label }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px' }}>
+      <div style={{ flex: 1, height: 1, background: 'var(--niro-border)' }} />
+      <span style={{ fontSize: 11, color: 'var(--niro-muted)', letterSpacing: '0.06em' }}>{label}</span>
+      <div style={{ flex: 1, height: 1, background: 'var(--niro-border)' }} />
+    </div>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────
+export default function MiraScreen({ isPanel = false }) {
   const { state, updateMira, closeMira, viewPractitioner, startBooking, navigate } = useApp();
   const { mira, user } = state;
   const [input, setInput] = useState('');
@@ -116,41 +139,45 @@ export default function MiraScreen() {
     const newMessages = [...mira.messages, userMsg];
     const newCount = mira.userMessageCount + 1;
 
+    // Phase advancement
     let newPhase = mira.phase;
-    if (mira.phase === 'reflection' && newCount >= 3) newPhase = 'qualification';
-    else if (mira.phase === 'qualification' && newCount >= 5) newPhase = 'recommendation';
+    if (mira.phase === 'reflection' && newCount >= 3) {
+      newPhase = 'qualification';
+    } else if (mira.phase === 'qualification' && isConfirmation(text)) {
+      newPhase = 'recommendation';
+    }
 
     updateMira({ messages: newMessages, userMessageCount: newCount, phase: newPhase });
     setInput('');
     setIsTyping(true);
 
     try {
-      const response = await callMira(newMessages, newPhase, user.name);
+      // topicId passes tile context (quit/lost/burnout/decision) to backend for Phase 1 opener
+      const response = await callMira(newMessages, newPhase, user.name, mira.entryTopic || null);
 
       if (newPhase === 'recommendation') {
-        try {
-          const jsonMatch = response.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const rec = JSON.parse(jsonMatch[0]);
-            updateMira({
-              messages: [...newMessages, { role: 'assistant', content: rec.summary }],
-              recommendation: rec,
-              artefact: rec.artefact,
-            });
-          } else {
-            updateMira({ messages: [...newMessages, { role: 'assistant', content: response }] });
-          }
-        } catch {
-          updateMira({ messages: [...newMessages, { role: 'assistant', content: response }] });
+        if (response.recommendation) {
+          // Backend parsed Phase 3 JSON — render recommendation + artefact cards
+          updateMira({
+            messages: [...newMessages, { role: 'assistant', content: response.recommendation.summary }],
+            recommendation: response.recommendation,
+            artefact: response.recommendation.artefact,
+          });
+        } else if (response.parseError) {
+          // Gemini returned non-JSON — show raw text as plain message, no crash
+          updateMira({
+            messages: [...newMessages, { role: 'assistant', content: response.text }],
+          });
+        } else {
+          updateMira({ messages: [...newMessages, { role: 'assistant', content: response.text }] });
         }
       } else {
-        updateMira({ messages: [...newMessages, { role: 'assistant', content: response }] });
+        updateMira({ messages: [...newMessages, { role: 'assistant', content: response.text }] });
       }
-    } catch (err) {
-      const msg = err.message.includes('VITE_ANTHROPIC_API_KEY')
-        ? 'To chat with Mira, add VITE_ANTHROPIC_API_KEY to your .env file.'
-        : 'Something went wrong. Please try again.';
-      updateMira({ messages: [...newMessages, { role: 'assistant', content: msg }] });
+    } catch {
+      updateMira({
+        messages: [...newMessages, { role: 'assistant', content: 'Mira is taking a moment. Try again in a few seconds.' }],
+      });
     } finally {
       setIsTyping(false);
     }
@@ -165,21 +192,28 @@ export default function MiraScreen() {
     }
   };
 
-  const getPhaseLabel = (idx) => {
-    const count = mira.messages.slice(0, idx).filter(m => m.role === 'user').length;
-    if (count === 3) return 'Getting clearer\u2026';
-    if (count === 5) return 'Almost there\u2026';
+  const getPhaseLabelBefore = (idx) => {
+    const countBefore = mira.messages.slice(0, idx).filter(m => m.role === 'user').length;
+    if (countBefore === 3) return 'Getting clearer…';
+    if (countBefore === 5) return 'Almost there…';
     return null;
   };
 
   if (showGate) return <PhoneGate onComplete={handleGateComplete} />;
 
+  const containerStyle = isPanel
+    ? { display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--niro-cream)' }
+    : { position: 'fixed', inset: 0, background: 'var(--niro-cream)', zIndex: 60, display: 'flex', flexDirection: 'column', maxWidth: 430, margin: '0 auto' };
+
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'var(--niro-cream)', zIndex: 60, display: 'flex', flexDirection: 'column', maxWidth: 430, margin: '0 auto' }}>
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--niro-border)', background: 'var(--niro-white)', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={closeMira} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-          <ArrowLeft size={20} color="var(--niro-ink)" />
-        </button>
+    <div style={containerStyle}>
+      {/* Header */}
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--niro-border)', background: 'var(--niro-white)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+        {!isPanel && (
+          <button onClick={closeMira} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+            <ArrowLeft size={20} color="var(--niro-ink)" />
+          </button>
+        )}
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 16, fontWeight: 500, color: 'var(--niro-ink)' }}>Mira</span>
@@ -189,6 +223,7 @@ export default function MiraScreen() {
         </div>
       </div>
 
+      {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 0' }}>
         {mira.messages.length === 0 && (
           <div style={{ padding: '40px 20px', textAlign: 'center' }}>
@@ -198,16 +233,10 @@ export default function MiraScreen() {
         )}
 
         {mira.messages.map((msg, idx) => {
-          const phaseLabel = getPhaseLabel(idx);
+          const phaseLabel = getPhaseLabelBefore(idx);
           return (
             <div key={idx}>
-              {phaseLabel && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px' }}>
-                  <div style={{ flex: 1, height: 1, background: 'var(--niro-border)' }} />
-                  <span style={{ fontSize: 11, color: 'var(--niro-muted)', letterSpacing: '0.06em' }}>{phaseLabel}</span>
-                  <div style={{ flex: 1, height: 1, background: 'var(--niro-border)' }} />
-                </div>
-              )}
+              {phaseLabel && <PhaseDivider label={phaseLabel} />}
               <div className="message-in" style={{ padding: '4px 16px', display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
                 <div style={{
                   maxWidth: '80%', padding: '10px 14px', borderRadius: 16,
@@ -232,13 +261,13 @@ export default function MiraScreen() {
             recommendation={mira.recommendation}
             onBook={() => {
               const p = PRACTITIONERS.find(pr => pr.id === mira.recommendation.practitionerId);
-              if (p) { closeMira(); startBooking(p); }
+              if (p) { if (!isPanel) closeMira(); startBooking(p); }
             }}
             onProfile={() => {
               const p = PRACTITIONERS.find(pr => pr.id === mira.recommendation.practitionerId);
-              if (p) { closeMira(); viewPractitioner(p); }
+              if (p) { if (!isPanel) closeMira(); viewPractitioner(p); }
             }}
-            onSelfServe={() => { navigate('self_serve'); closeMira(); }}
+            onSelfServe={() => { navigate('self_serve'); if (!isPanel) closeMira(); }}
           />
         )}
 
@@ -246,12 +275,13 @@ export default function MiraScreen() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div style={{ padding: '10px 14px 20px', background: 'var(--niro-white)', borderTop: '1px solid var(--niro-border)', display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+      {/* Input */}
+      <div style={{ padding: '10px 14px 20px', background: 'var(--niro-white)', borderTop: '1px solid var(--niro-border)', display: 'flex', gap: 10, alignItems: 'flex-end', flexShrink: 0 }}>
         <textarea
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
-          placeholder="Tell Mira what's going on\u2026"
+          placeholder="Tell Mira what's going on…"
           rows={1}
           style={{ flex: 1, padding: '10px 14px', borderRadius: 12, border: '1px solid var(--niro-border)', fontSize: 14, resize: 'none', outline: 'none', lineHeight: 1.5, color: 'var(--niro-ink)', background: 'var(--niro-cream)', maxHeight: 100, overflowY: 'auto' }}
         />

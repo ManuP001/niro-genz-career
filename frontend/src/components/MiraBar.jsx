@@ -6,10 +6,11 @@ export default function MiraBar() {
 
   return (
     <div
+      className="mira-bar-mobile"
       onClick={() => openMira()}
       style={{
         position: 'fixed', bottom: 56, left: '50%', transform: 'translateX(-50%)',
-        width: '100%', maxWidth: 430,
+        width: '100%', maxWidth: 560,
         background: 'var(--niro-white)', borderTop: '1px solid var(--niro-border)',
         padding: '10px 14px 8px', display: 'flex', alignItems: 'center', gap: 10,
         cursor: 'pointer', zIndex: 40,

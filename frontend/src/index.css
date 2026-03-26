@@ -45,3 +45,72 @@ body {
 .typing-dot:nth-child(3) { animation: typing-dot 1.2s ease-in-out infinite 0.4s; }
 
 input, textarea { font-family: 'DM Sans', sans-serif; }
+
+/* ── Responsive app shell ─────────────────────────────────────────────────── */
+.app-root {
+  width: 100%;
+  min-height: 100vh;
+  background: var(--niro-cream);
+}
+
+.content-column {
+  width: 100%;
+  max-width: 430px;
+  margin: 0 auto;
+  position: relative;
+  min-height: 100vh;
+  background: var(--niro-cream);
+}
+
+/* Tablet: widen column, hide bottom nav */
+@media (min-width: 640px) {
+  .content-column { max-width: 560px; }
+  .bottom-nav-mobile { display: none !important; }
+  .mira-bar-mobile { bottom: 0 !important; }
+}
+
+/* Desktop: two-column grid layout */
+@media (min-width: 1024px) {
+  .app-root {
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    max-width: 1080px;
+    margin: 0 auto;
+    min-height: 100vh;
+    border-left: 1px solid var(--niro-border);
+    border-right: 1px solid var(--niro-border);
+  }
+  .content-column {
+    max-width: 400px;
+    border-right: 1px solid var(--niro-border);
+    overflow-y: auto;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+  }
+  .mira-panel {
+    display: flex !important;
+    flex-direction: column;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    overflow: hidden;
+    background: var(--niro-cream);
+  }
+  .bottom-nav-mobile { display: none !important; }
+  .mira-bar-mobile { display: none !important; }
+}
+
+/* Hide mira-panel on mobile/tablet by default — CSS shows it on desktop */
+.mira-panel { display: none; }
+
+/* Mobile Mira full-screen overlay — hidden on desktop (panel handles it) */
+.mira-mobile-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--niro-cream);
+}
+@media (min-width: 1024px) {
+  .mira-mobile-fullscreen { display: none; }
+}
